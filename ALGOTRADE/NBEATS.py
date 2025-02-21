@@ -1,5 +1,7 @@
 # Import necessary libraries
 import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
 import torch
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
@@ -14,19 +16,28 @@ class NBEATSBlock(nn.Module):
         super().__init__()
         self.stem = nn.Sequential(  # input size: (batch_size, 1, H*n)
             nn.Linear(in_features=H*n, out_features=512), nn.ReLU(), nn.Dropout(dropout_prob),
-            nn.Linear(in_features=512, out_features=1024), nn.ReLU(), nn.Dropout(dropout_prob),
-            nn.Linear(in_features=1024, out_features=512), nn.ReLU(), nn.Dropout(dropout_prob),
-            nn.Linear(in_features=512, out_features=256), nn.ReLU()
+            nn.Linear(in_features=512, out_features=512), nn.ReLU(), nn.Dropout(dropout_prob),
+            nn.Linear(in_features=512, out_features=512), nn.ReLU(), nn.Dropout(dropout_prob),
+            nn.Linear(in_features=512, out_features=512), nn.ReLU()
         )
 
-        # In generic architecture, the backcast and forecast transformations are just linear layers
-        self.backcast = nn.Linear(in_features=256, out_features=H*n)
-        self.forecast = nn.Linear(in_features=256, out_features=H)
+        # Generate thetas for backcast and forecast
+        self.b1 = nn.Linear(in_features=512, out_features=512)
+        self.b2 = nn.Linear(in_features=512, out_features=512)
+
+        # Generate the backcast and forecast
+        self.g_b = nn.Linear(in_features=512, out_features=H*n, bias=False)
+        self.g_f = nn.Linear(in_features=512, out_features=H, bias=False)
 
     def forward(self, x):
         x = self.stem(x)
-        x_bc = self.backcast(x)
-        x_fc = self.forecast(x)
+
+        # Generate thetas for backcast and forecast
+        theta_b = self.b1(x)  # backcast
+        theta_f = self.b2(x)  # forecast
+
+        x_bc = self.g_b(theta_b)
+        x_fc = self.g_f(theta_f)
 
         return x_bc, x_fc
     
@@ -209,3 +220,19 @@ def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, 
     axs[1].set_title("Validation Loss Curve")
     axs[1].legend()
     axs[1].grid()
+
+# Check for GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+M = 3 # Number of stacks in the network
+K = 30  # Number of blocks in the stack
+H = 10  # Forecast horizon
+n = 5  # Look back n times the forecast horizon
+
+# Initialize model
+model = NBEATS(M, K, H, n).to(device)
+
+# Choose loss function and optimizer
+loss_func = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
