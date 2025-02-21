@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.utils.data import TensorDataset, DataLoader
 
+# Generic architecture
 class NBEATSBlock(nn.Module):
     def __init__(self, H, n, dropout_prob=0.1):
         """
@@ -26,8 +27,8 @@ class NBEATSBlock(nn.Module):
         self.b2 = nn.Linear(in_features=512, out_features=512)
 
         # Generate the backcast and forecast
-        self.g_b = nn.Linear(in_features=512, out_features=H*n, bias=False)
-        self.g_f = nn.Linear(in_features=512, out_features=H, bias=False)
+        self.g_b = nn.Linear(in_features=512, out_features=H*n)
+        self.g_f = nn.Linear(in_features=512, out_features=H)
 
     def forward(self, x):
         x = self.stem(x)
