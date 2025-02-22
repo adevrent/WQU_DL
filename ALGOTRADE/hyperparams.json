@@ -3,5 +3,6 @@
     "K": 30,
     "H": 3,
     "n": 5,
+    "batch_size": 1024,
     "num_epochs": 150
 }

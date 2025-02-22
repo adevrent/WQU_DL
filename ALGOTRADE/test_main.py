@@ -13,15 +13,13 @@ end_date = "2021-03-01"
 
 # Read the CSV file
 series = dataloaders.read_csv(data_filepath, date_col="Timestamp", value_col="Close", start_date=start_date, end_date=end_date)
+print(series.head())
 
-# Hyperparams
-M = 3 # Number of stacks in the network
-K = 30  # Number of blocks in the stack
-H = 3  # Forecast horizon
-n = 5  # Look back n times the forecast horizon
+# Load hyperparameters
+M, K, H, n, batch_size, num_epochs = dataloaders.load_hyperparams()
 
 # Create the dataloaders
-train_loader, val_loader, test_loader = dataloaders.NBEATS_Data_Loader(series, H, n, val_size=0.2, test_size=0.1, batch_size=1024)
+train_loader, val_loader, test_loader = dataloaders.NBEATS_Data_Loader(series, H, n, val_size=0.2, test_size=0.1, batch_size=batch_size)
 
 # Check for GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

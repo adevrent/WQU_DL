@@ -2,6 +2,18 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import TensorDataset, DataLoader
+import json
+
+def load_hyperparams(hyperparams_filepath="hyperparams.json"):
+    with open (hyperparams_filepath) as r:
+        hyperparams = json.load(r)
+
+    for key, value in hyperparams.items():
+        hyperparams[key] = int(value)
+
+    return hyperparams.values()
+
+M, K, H, n, batch_size, num_epochs = load_hyperparams()
 
 def read_csv(filepath, date_col, value_col, start_date, end_date):
     """
