@@ -1,10 +1,10 @@
 # Import necessary libraries
-import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
 import torch
 from torch import nn
-from torch.utils.data import TensorDataset, DataLoader
+
+import yfinance as yf
+from datetime import date
 
 # Generic architecture
 class NBEATSBlock(nn.Module):
@@ -50,11 +50,12 @@ class NBEATSStack(nn.Module):
         H (int): Forecast horizon (number of future time steps to predict)
         n (int): How many times the forecast horizon to look back
         """
+        self.H = H
         super().__init__()
         self.blocks = nn.ModuleList([NBEATSBlock(H, n) for _ in range(K)])
 
     def forward(self, x):
-        x_fc_sum = torch.zeros(x.size(0), H, dtype=x.dtype).to(x.device)
+        x_fc_sum = torch.zeros(x.size(0), self.H, dtype=x.dtype).to(x.device)
         residual = x  # start with the original input
         for block in self.blocks:
             x_bc, x_fc = block(residual)
@@ -88,61 +89,8 @@ class NBEATS(nn.Module):
             forecast_total += stack_forecast
             
         return forecast_total
-    
-def featurize_series_NBEATS(series, H, n):
-    """
-    Parameters:
-    series (pd.Series): Time series to convert to PyTorch tensor
-    H (int): Forecast horizon (number of future time steps to predict)
-    n (int): How many times the forecast horizon to look back
-    """
-    series = series.values.astype(np.float32)
 
-    # Create the feature tensor X by rolling the series n times
-    num_rows = len(series) - H*n - H + 1
-    X = np.zeros((num_rows, H*n))
-    Y = np.zeros((num_rows, H))
-    for i in range(num_rows):
-        X[i, :] = series[i : i + H*n]
-        Y[i, :] = series[i + H*n : i + H*n + H]
-
-    X = torch.tensor(X, dtype=torch.float32)
-    Y = torch.tensor(Y, dtype=torch.float32)
-
-    return X, Y
-
-def train_val_split(X, Y, val_size=0.2):
-    """
-    Parameters:
-    X (torch.Tensor): Input feature tensor
-    Y (torch.Tensor): Target tensor
-    val_size (float): Proportion of the data to use for validation
-    """
-    num_train = int((1-val_size) * len(X))
-    X_train, Y_train = X[:num_train], Y[:num_train]
-    X_val, Y_val = X[num_train:], Y[num_train:]
-
-    return X_train, Y_train, X_val, Y_val
-
-def create_data_loaders(X_train, Y_train, X_val, Y_val, batch_size):
-    """
-    Parameters:
-    X_train (torch.Tensor): Input feature tensor for training
-    Y_train (torch.Tensor): Target tensor for training
-    X_val (torch.Tensor): Input feature tensor for validation
-    Y_val (torch.Tensor): Target tensor for validation
-    batch_size (int): Number of samples
-    """
-    train_dataset = TensorDataset(X_train, Y_train)
-    val_dataset   = TensorDataset(X_val, Y_val)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_loader, val_loader
-
-def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, feature="prices"):
-    num_epochs = 100
+def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, num_epochs, feature="prices"):
     train_losses = []
     val_losses = []
     best_val_loss = float('inf')
@@ -222,18 +170,5 @@ def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, 
     axs[1].legend()
     axs[1].grid()
 
-# Check for GPU
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
-
-M = 3 # Number of stacks in the network
-K = 30  # Number of blocks in the stack
-H = 10  # Forecast horizon
-n = 5  # Look back n times the forecast horizon
-
-# Initialize model
-model = NBEATS(M, K, H, n).to(device)
-
-# Choose loss function and optimizer
-loss_func = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    fig.tight_layout()
+    plt.show(block=True)
