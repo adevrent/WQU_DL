@@ -2,9 +2,7 @@
 from matplotlib import pyplot as plt
 import torch
 from torch import nn
-
-import yfinance as yf
-from datetime import date
+import numpy as np
 
 # Generic architecture
 class NBEATSBlock(nn.Module):
@@ -90,11 +88,10 @@ class NBEATS(nn.Module):
             
         return forecast_total
 
-def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, num_epochs, feature="prices"):
+def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, num_epochs, feature="prices", patience=10):
     train_losses = []
     val_losses = []
     best_val_loss = float('inf')
-    patience = 10
     epochs_without_improve = 0
 
     if feature == "prices":
@@ -171,4 +168,84 @@ def train_NBEATS(train_loader, val_loader, model, loss_func, optimizer, device, 
     axs[1].grid()
 
     fig.tight_layout()
+    plt.show(block=True)
+
+def test_NBEATS(test_loader, model, loss_func, device, weights_filepath):
+    """
+    Loads the optimum weights, evaluates the model on the test set, prints the sMAPE value,
+    and plots forecast vs. true curves for 10 random samples (5x2 subplots). 
+    Additionally, shows ratio difference (%) on a secondary y-axis.
+    
+    Parameters:
+        test_loader (DataLoader): DataLoader for the test set.
+        model (nn.Module): The NBEATS model instance.
+        loss_func (callable): The loss function to compute sMAPE.
+        device (torch.device): Device (cuda or cpu) on which to run the evaluation.
+        weights_filepath (str): Path to the optimum weights file (.pth).
+    """
+    # Load the optimum weights
+    model.load_state_dict(torch.load(weights_filepath, map_location=device))
+    model.to(device)
+    model.eval()
+    
+    forecasts_list = []
+    targets_list = []
+    
+    with torch.no_grad():
+        for inputs, targets in test_loader:
+            inputs = inputs.to(device)
+            targets = targets.to(device)
+            forecasts = model(inputs)
+            forecasts_list.append(forecasts)
+            targets_list.append(targets)
+    
+    # Concatenate all batches
+    forecasts_all = torch.cat(forecasts_list, dim=0)  # shape: (num_samples, H)
+    targets_all = torch.cat(targets_list, dim=0)      # shape: (num_samples, H)
+    
+    # Compute sMAPE on the entire test set
+    test_smape = loss_func(forecasts_all, targets_all).item()
+    print(f"Test sMAPE: {test_smape:.4f}")
+    
+    # Plot 10 random samples in a single figure with 5 rows, 2 columns
+    num_samples = forecasts_all.shape[0]
+    sample_indices = np.random.choice(num_samples, size=10, replace=False)
+    
+    fig, axes = plt.subplots(nrows=5, ncols=2, figsize=(12, 15), sharex=False)
+    axes = axes.flatten()  # so we can iterate easily
+
+    for i, idx in enumerate(sample_indices):
+        ax = axes[i]
+        forecast_sample = forecasts_all[idx].cpu().numpy()
+        target_sample = targets_all[idx].cpu().numpy()
+        
+        # Plot forecast vs. actual
+        ax.plot(target_sample, marker='o', label="Actual")
+        ax.plot(forecast_sample, marker='x', label="Forecast")
+        ax.set_title(f"Sample {idx} - Forecast vs Actual", fontsize=10)
+        ax.set_ylabel("Value")
+        ax.grid(True)
+        
+        # Only label the x-axis for the bottom row (the last 2 plots)
+        if i < 8:  
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Time Step")
+
+        # Create a twin axis for ratio difference
+        ax2 = ax.twinx()
+        # ratio_diff = 100 * (Forecast/Actual - 1)
+        # Avoid division by zero by adding a small epsilon if necessary
+        eps = 1e-8
+        ratio_diff = 100.0 * ((forecast_sample + eps) / (target_sample + eps) - 1.0)
+        ax2.plot(ratio_diff, color='tab:red', linestyle='--', label="Ratio Diff (%)")
+        ax2.set_ylabel("Ratio Diff (%)", color='tab:red')
+        ax2.tick_params(axis='y', labelcolor='tab:red')
+
+        # Combine legends from both axes
+        lines_1, labels_1 = ax.get_legend_handles_labels()
+        lines_2, labels_2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper right")
+    plt.subplots_adjust(hspace=0.4, wspace=0.3)  # increase spacing
+    plt.tight_layout()
     plt.show(block=True)
