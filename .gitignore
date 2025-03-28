@@ -6,3 +6,6 @@ ALGOTRADE/best*
 ALGOTRADE/nbeats*
 ALGOTRADE/static_files
 GWP2/model_weights*
+GWP3/best*
+GWP3/lstm*
+GWP3/nbeats*
