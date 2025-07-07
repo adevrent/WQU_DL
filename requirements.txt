@@ -5,3 +5,7 @@ matplotlib
 tabulate
 arch
 cvxpy
+sympy
+yfinance
+scipy
+seaborn
