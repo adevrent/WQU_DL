@@ -1,4 +1,4 @@
-numpy < 2.2
+numpy>=2.0
 pandas
 pandas_datareader
 matplotlib
@@ -7,6 +7,9 @@ arch
 cvxpy
 sympy
 yfinance
-scipy
+scipy>=1.16
 seaborn
 numba
+statsmodels>=0.14.5
+frds
+tables
