@@ -13,7 +13,7 @@ def d_covar(j_ret, i_ret, q=0.05):
     covar_50 = b0 + b1 * med_i
     return {"VaR_j_q": var_j_q, "CoVaR_q_j|i": covar_q, "CoVaR_50_j|i": covar_50, "Delta_CoVaR": covar_q - covar_50}
 
-# tiny demo
+# test
 if __name__ == "__main__":
     rng = np.random.default_rng(0)
     i = rng.normal(0,1,2000)
